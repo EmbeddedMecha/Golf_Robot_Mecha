@@ -43,9 +43,9 @@ v_min = [156, 95, 104, 61, 104]
 min_area = [50, 50, 50, 10, 10]
 
 now_color = 0
-serial_use = 1
+# serial_use = 1
 
-serial_port = None
+# serial_port = None
 Temp_count = 0
 Read_RX = 0
 
@@ -327,6 +327,34 @@ def hsv_setting_read():
         print("hsv_setting_read OK")
         return 1
 
+#*************************
+# 격자 (10, 14), (11, 14), (10, 15), (11, 15) 영역에 대한 마스크 확인
+def check_filled_grids(mask):
+    height, width = mask.shape
+    grid_size = 40
+    fill_threshold = 0.6 #꽉 차있다고 판단할 비율
+
+    grids_to_check = [(10, 14), (9, 14), (10, 15), (9, 15)] #체크할 격자 좌표
+
+    for grid in grids_to_check:
+        x_start = grid[0] * grid_size
+        y_start = grid[1] * grid_size
+        x_end = x_start + grid_size
+        y_end = y_start + grid_size
+
+        grid_area = mask[y_start:y_end, x_start:x_end] #격자 영역 자르기
+
+        # 격자 영역에서 흰색 픽셀 수 세기
+        filled_pixels = cv2.countNonZero(grid_area)
+        total_pixels = grid_area.size
+
+        # 꽉 차있으면 동작
+        if total_pixels > 0:
+            if filled_pixels / total_pixels >= fill_threshold:
+                 TX_data(serial_port, 2)
+        else:
+             print("경고: total_pixels가 0입니다. 이 격자는 건너뜁니다.")
+
 
 # **************************************************
 # **************************************************
@@ -412,19 +440,19 @@ if __name__ == '__main__':
     cv2.moveWindow('mini CTS5 - Video', 322, 36)
     cv2.setMouseCallback('mini CTS5 - Video', mouse_move)
 
-    if serial_use != 0:
-        BPS = 4800
-        serial_port = serial.Serial('COM11', BPS, timeout=0.01)
-        serial_port.flush()
-        time.sleep(0.5)
+    # if serial_use != 0:
+    #     BPS = 4800
+    #     serial_port = serial.Serial('COM11', BPS, timeout=0.01)
+    #     serial_port.flush()
+    #     time.sleep(0.5)
 
-        serial_t = Thread(target=RX_Receiving, args=(serial_port,))
-        serial_t.daemon = True
-        serial_t.start()
+    #     serial_t = Thread(target=RX_Receiving, args=(serial_port,))
+    #     serial_t.daemon = True
+    #     serial_t.start()
 
-    TX_data(serial_port, 250)
-    TX_data(serial_port, 250)
-    TX_data(serial_port, 250)
+    # TX_data(serial_port, 250)
+    # TX_data(serial_port, 250)
+    # TX_data(serial_port, 250)
     old_time = clock()
 
     View_select = 0
@@ -440,6 +468,8 @@ if __name__ == '__main__':
 
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2YUV)  # HSV => YUV
         mask = cv2.inRange(hsv, hsv_Lower, hsv_Upper)
+
+        check_filled_grids(mask)
 
         hsv_Lower = (h_min[now_color], s_min[now_color], v_min[now_color])
         hsv_Upper = (h_max[now_color], s_max[now_color], v_max[now_color])
